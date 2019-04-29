@@ -467,6 +467,11 @@ s32 sys_net_bnet_connect(ppu_thread& ppu, s32 s, vm::ptr<sys_net_sockaddr> addr,
 
 		if (result)
 		{
+			if (result == 10056)
+			{
+				return true;
+			}
+
 			if (result == SYS_NET_EWOULDBLOCK)
 			{
 				result = SYS_NET_EINPROGRESS;
