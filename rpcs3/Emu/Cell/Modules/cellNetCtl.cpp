@@ -132,6 +132,13 @@ error_code cellNetCtlGetInfo(s32 code, vm::ptr<CellNetCtlInfo> info)
 		return CELL_OK;
 	}
 
+	if (code == CELL_NET_CTL_INFO_PRIMARY_DNS || code == CELL_NET_CTL_INFO_PRIMARY_DNS )
+	{
+		strcpy_trunc(info->primary_dns, "1.1.1.1");
+		strcpy_trunc(info->secondary_dns, "1.0.0.1");
+		return CELL_OK;
+	}
+
 	if (g_cfg.net.net_status == CELL_NET_CTL_STATE_Disconnected)
 	{
 		return CELL_NET_CTL_ERROR_NOT_CONNECTED;
