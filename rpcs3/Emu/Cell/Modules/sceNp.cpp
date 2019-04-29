@@ -12,7 +12,7 @@
 
 LOG_CHANNEL(sceNp);
 
-s32 g_psn_connection_status = SCE_NP_MANAGER_STATUS_OFFLINE;
+s32 g_psn_connection_status = SCE_NP_MANAGER_STATUS_ONLINE;
 
 s32 sceNpInit(u32 poolsize, vm::ptr<void> poolptr)
 {
