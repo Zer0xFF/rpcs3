@@ -125,10 +125,23 @@ error_code cellNetCtlGetInfo(s32 code, vm::ptr<CellNetCtlInfo> info)
 {
 	cellNetCtl.todo("cellNetCtlGetInfo(code=0x%x (%s), info=*0x%x)", code, InfoCodeToName(code), info);
 
+	if (code == CELL_NET_CTL_INFO_PRIMARY_DNS || code == CELL_NET_CTL_INFO_SECONDARY_DNS)
+	{
+		strcpy_trunc(info->primary_dns, "1.1.1.1");
+		strcpy_trunc(info->secondary_dns, "1.0.0.1");
+		return CELL_OK;
+	}
+
 	if (code == CELL_NET_CTL_INFO_ETHER_ADDR)
 	{
 		// dummy values set
-		std::memset(info->ether_addr.data, 0xFF, sizeof(info->ether_addr.data));
+		info->ether_addr.data[0] = 0x1C;
+		info->ether_addr.data[1] = 0x87;
+		info->ether_addr.data[2] = 0x2C;
+		info->ether_addr.data[3] = 0xB7;
+		info->ether_addr.data[4] = 0xDE;
+		info->ether_addr.data[5] = 0x09;
+		// std::memset(info->ether_addr.data, 0xFF, sizeof(info->ether_addr.data));
 		return CELL_OK;
 	}
 

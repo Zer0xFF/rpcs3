@@ -69,7 +69,7 @@ static s32 get_last_error(bool is_blocking, int native_error = 0)
 
 	if (name && result != SYS_NET_EWOULDBLOCK && result != SYS_NET_EINPROGRESS)
 	{
-		sys_net.error("Socket error %s", name);
+		sys_net.error("Socket error %s (%d)", name, native_error);
 	}
 
 	if (is_blocking && result == SYS_NET_EWOULDBLOCK)
@@ -78,6 +78,11 @@ static s32 get_last_error(bool is_blocking, int native_error = 0)
 	}
 
 	if (is_blocking && result == SYS_NET_EINPROGRESS)
+	{
+		return 0;
+	}
+
+	if (result == 10056)
 	{
 		return 0;
 	}
@@ -403,13 +408,19 @@ s32 sys_net_bnet_bind(ppu_thread& ppu, s32 s, vm::cptr<sys_net_sockaddr> addr, u
 	name.sin_port        = htons(((sys_net_sockaddr_in*)addr.get_ptr())->sin_port);
 	name.sin_addr.s_addr = htonl(((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr);
 	::socklen_t namelen  = sizeof(name);
-
+		sys_net.error("sys_net_bnet_bind(s=%d): add sys_net_sockaddr_in(sin_addr=0x%x, sin_port=%d)", s, ((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr, ((sys_net_sockaddr_in*)addr.get_ptr())->sin_port);
+		// if(0 == ((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr)
+		// {
+		// 	((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr   = 0x01000001;
+		// }
+		sys_net.error("sys_net_bnet_bind(s=%d): name: sys_net_sockaddr_in(sin_addr=%s, sin_port=%d)", s, inet_ntoa(name.sin_addr), ntohs(name.sin_port));
 	const auto sock = idm::check<lv2_socket>(s, [&](lv2_socket& sock) -> s32
 	{
 		std::lock_guard lock(sock.mutex);
 
 		if (::bind(sock.socket, (::sockaddr*)&name, namelen) == 0)
 		{
+			sys_net.error("sys_net_bnet_bind(s=%d): name2: sys_net_sockaddr_in(sin_addr=%s, sin_port=%d)", s, inet_ntoa(name.sin_addr), ntohs(name.sin_port));
 			return 0;
 		}
 
@@ -443,13 +454,13 @@ s32 sys_net_bnet_connect(ppu_thread& ppu, s32 s, vm::ptr<sys_net_sockaddr> addr,
 		{
 			// Hack for DNS (8.8.8.8:53)
 			name.sin_port        = htons(53);
-			name.sin_addr.s_addr = 0x08080808;
+			name.sin_addr.s_addr = 0x01000001;
 
 			// Overwrite arg (probably used to validate recvfrom addr)
 			((sys_net_sockaddr_in*)addr.get_ptr())->sin_family = SYS_NET_AF_INET;
 			((sys_net_sockaddr_in*)addr.get_ptr())->sin_port   = 53;
-			((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr   = 0x08080808;
-			sys_net.warning("sys_net_bnet_connect(s=%d): using DNS 8.8.8.8:53...");
+			((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr   = 0x01000001;
+			sys_net.warning("sys_net_bnet_connect(s=%d): using DNS 1.0.0.1:53...", s);
 		}
 		else if (addr->sa_family != SYS_NET_AF_INET)
 		{
@@ -465,14 +476,22 @@ s32 sys_net_bnet_connect(ppu_thread& ppu, s32 s, vm::ptr<sys_net_sockaddr> addr,
 
 		result = get_last_error(is_blocking);
 
+		{
+			sys_net_sockaddr_in* addr2 = ((sys_net_sockaddr_in*)addr.get_ptr());
+			sys_net.error("sys_net_bnet_connect(s=%d): uf_name: sys_net_sockaddr_in(sin_addr=0x%x, sin_port=%d)", s, (name.sin_addr.s_addr), (name.sin_port));
+			sys_net.error("sys_net_bnet_connect(s=%d): add2: sys_net_sockaddr_in(sin_addr=0x%x, sin_port=%d)", s, (addr2->sin_addr), (addr2->sin_port));
+			sys_net.error("sys_net_bnet_connect(s=%d): name: sys_net_sockaddr_in(sin_addr=%s, sin_port=%d)", s, inet_ntoa(name.sin_addr), ntohs(name.sin_port));
+		}
+
 		if (result)
 		{
+
 			if (result == SYS_NET_EWOULDBLOCK)
 			{
 				result = SYS_NET_EINPROGRESS;
 			}
 
-			if (result == SYS_NET_EINPROGRESS)
+			if (result == SYS_NET_EINPROGRESS || result == SYS_NET_EALREADY)
 			{
 				sock.events += lv2_socket::poll::write;
 				sock.queue.emplace_back(u32{0}, [&sock](bs_t<lv2_socket::poll> events) -> bool
@@ -1037,10 +1056,17 @@ s32 sys_net_bnet_sendto(ppu_thread& ppu, s32 s, vm::cptr<void> buf, u32 len, s32
 
 	if (addr)
 	{
+		sys_net_sockaddr_in* addr2 = ((sys_net_sockaddr_in*)addr.get_ptr());
+		sys_net.error("sys_net_bnet_sendto(s=%d): add sys_net_sockaddr_in(sin_addr=0x%x, sin_port=%d)", s, addr2->sin_addr, addr2->sin_port);
+		if(0 == ((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr)
+		{
+			((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr   = 0x01000001;
+		}
 		name.sin_family      = AF_INET;
 		name.sin_port        = htons(((sys_net_sockaddr_in*)addr.get_ptr())->sin_port);
 		name.sin_addr.s_addr = htonl(((sys_net_sockaddr_in*)addr.get_ptr())->sin_addr);
-	}
+		sys_net.error("sys_net_bnet_sendto(s=%d): name: sys_net_sockaddr_in(sin_addr=%s, sin_port=%d)", s, inet_ntoa(name.sin_addr), ntohs(name.sin_port));
+}
 
 	::socklen_t namelen = sizeof(name);
 	s32 result = 0;
@@ -1066,6 +1092,12 @@ s32 sys_net_bnet_sendto(ppu_thread& ppu, s32 s, vm::cptr<void> buf, u32 len, s32
 				return true;
 			}
 
+			// int native_error2 = WSAGetLastError();
+			// if (native_error2 == 10049)
+			{
+				sys_net_sockaddr_in* addr2 = ((sys_net_sockaddr_in*)addr.get_ptr());
+				sys_net.error("sys_net_bnet_sendto(s=%d): add2 sys_net_sockaddr_in(sin_addr=0x%x, sin_port=%d)", s, addr2->sin_addr, addr2->sin_port);
+			}
 			result = get_last_error(!sock.so_nbio && (flags & SYS_NET_MSG_DONTWAIT) == 0);
 
 			if (result)
@@ -1839,6 +1871,25 @@ s32 sys_net_abort(ppu_thread& ppu, s32 type, u64 arg, s32 flags)
 s32 sys_net_infoctl(ppu_thread& ppu, s32 cmd, vm::ptr<void> arg)
 {
 	sys_net.todo("sys_net_infoctl(cmd=%d, arg=*0x%x)", cmd, arg);
+	for(int i = 0; i < 254 / 4; ++i)
+	{
+		sys_net.warning("arg[%d] = 0x%x", i, ((be_t<u32>*)arg.get_ptr())[i]);
+	}
+	int i = 0;
+	while(i < 8 && ((char*)arg.get_ptr())[i] == 0)
+	{
+		++i;
+	}
+	if(i == 8)
+	if(cmd == 8)
+	{
+		// arg[0] = 99;
+		// arg[1] = 99;
+		// arg[2] = 99;
+		// ((int*)arg.get_ptr())[3] = 1;
+		// arg[4] = 99;
+		// arg[5] = 99;
+	}
 	return 0;
 }
 

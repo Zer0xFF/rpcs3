@@ -12,7 +12,7 @@
 
 LOG_CHANNEL(sceNp);
 
-s32 g_psn_connection_status = SCE_NP_MANAGER_STATUS_OFFLINE;
+s32 g_psn_connection_status = SCE_NP_MANAGER_STATUS_ONLINE;
 
 s32 sceNpInit(u32 poolsize, vm::ptr<void> poolptr)
 {
@@ -1069,8 +1069,11 @@ s32 sceNpManagerGetNetworkTime(vm::ptr<CellRtcTick> pTick)
 	}
 
 	// FIXME: Get the network time
-	auto now = std::chrono::system_clock::now();
-	pTick->tick = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+	using year = std::chrono::duration<int, std::ratio<31556952>>;
+	auto now = std::chrono::system_clock::now().time_since_epoch();
+	year offset((2019 - 50));
+	std::chrono::minutes offset2((11 * 60) + 25);
+	pTick->tick = std::chrono::duration_cast<std::chrono::microseconds>(offset + now - offset2).count();
 
 	return CELL_OK;
 }
@@ -1250,7 +1253,7 @@ s32 sceNpManagerGetContentRatingFlag(vm::ptr<s32> isRestricted, vm::ptr<s32> age
 
 	// TODO: read user's parental control information
 	*isRestricted = 0;
-	*age = 18;
+	*age = 99;
 
 	return CELL_OK;
 }
